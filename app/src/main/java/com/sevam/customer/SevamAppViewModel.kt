@@ -1,6 +1,7 @@
 package com.sevam.customer
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.sevam.customer.partner.data.MockPartnerRepository
 import com.sevam.customer.partner.data.PartnerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -8,6 +9,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 enum class OnboardingStep {
     BASIC_PROFILE,
@@ -122,10 +124,9 @@ data class SevamPartnerUiState(
 private const val OTP_MAX_LENGTH = 6
 
 @HiltViewModel
-class SevamAppViewModel @Inject constructor() : ViewModel() {
-
-    private val repository: PartnerRepository = MockPartnerRepository()
-
+class SevamAppViewModel @Inject constructor(
+    private val repository: PartnerRepository,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(repository.initialState())
     val uiState: StateFlow<SevamPartnerUiState> = _uiState
 
@@ -163,6 +164,7 @@ class SevamAppViewModel @Inject constructor() : ViewModel() {
                 authErrorMessage = null,
             )
         }
+        refreshPartnerData()
     }
 
     fun logout() {
@@ -188,6 +190,7 @@ class SevamAppViewModel @Inject constructor() : ViewModel() {
             return
         }
         _uiState.update { it.copy(onboardingStep = OnboardingStep.KYC, authErrorMessage = null) }
+        syncPartnerProfile()
     }
 
     fun selectIdType(value: String) {
@@ -272,6 +275,7 @@ class SevamAppViewModel @Inject constructor() : ViewModel() {
             return
         }
         _uiState.update { it.copy(onboardingStep = OnboardingStep.PAYOUT, authErrorMessage = null) }
+        syncPartnerProfile()
     }
 
     fun updateUpi(value: String) {
@@ -297,6 +301,7 @@ class SevamAppViewModel @Inject constructor() : ViewModel() {
                 authErrorMessage = null,
             )
         }
+        syncPartnerProfile()
     }
 
     fun approveForDemo() {
@@ -311,12 +316,9 @@ class SevamAppViewModel @Inject constructor() : ViewModel() {
     }
 
     fun toggleOnline() {
-        _uiState.update {
-            if (it.approvalStatus == ApprovalStatus.APPROVED) {
-                it.copy(isOnline = !it.isOnline)
-            } else {
-                it.copy(authErrorMessage = "Admin approval is required before going online.")
-            }
+        viewModelScope.launch {
+            val current = _uiState.value
+            _uiState.value = repository.setOnline(current, !current.isOnline)
         }
     }
 
@@ -325,43 +327,27 @@ class SevamAppViewModel @Inject constructor() : ViewModel() {
     }
 
     fun acceptJob(jobId: String) {
-        _uiState.update {
-            val request = it.jobRequests.firstOrNull { job -> job.id == jobId } ?: return@update it
-            it.copy(
-                jobRequests = it.jobRequests.filterNot { job -> job.id == jobId },
-                jobs = listOf(request.copy(status = JobStatus.ACCEPTED)) + it.jobs,
-            )
+        viewModelScope.launch {
+            _uiState.value = repository.acceptJob(_uiState.value, jobId)
         }
     }
 
     fun rejectJob(jobId: String) {
-        _uiState.update { it.copy(jobRequests = it.jobRequests.filterNot { job -> job.id == jobId }) }
+        viewModelScope.launch {
+            _uiState.value = repository.rejectJob(_uiState.value, jobId)
+        }
     }
 
     fun advanceJob(jobId: String) {
-        _uiState.update {
-            it.copy(
-                jobs = it.jobs.map { job ->
-                    if (job.id != jobId) {
-                        job
-                    } else {
-                        job.copy(
-                            status = when (job.status) {
-                                JobStatus.ACCEPTED -> JobStatus.ON_THE_WAY
-                                JobStatus.ON_THE_WAY -> JobStatus.ARRIVED
-                                JobStatus.ARRIVED -> JobStatus.STARTED
-                                JobStatus.STARTED -> JobStatus.COMPLETED
-                                else -> job.status
-                            },
-                        )
-                    }
-                },
-            )
+        viewModelScope.launch {
+            _uiState.value = repository.advanceJob(_uiState.value, jobId)
         }
     }
 
     fun selectSupportCategory(category: String) {
-        _uiState.update { it.copy(supportCategory = category) }
+        viewModelScope.launch {
+            _uiState.value = repository.createSupportTicket(_uiState.value, category)
+        }
     }
 
     fun skillsForSelectedCategory(): List<String> {
@@ -375,6 +361,18 @@ class SevamAppViewModel @Inject constructor() : ViewModel() {
     private fun normalizePhoneNumber(value: String): String {
         val compact = value.replace(" ", "")
         return if (compact.startsWith("+")) compact else "+91$compact"
+    }
+
+    private fun refreshPartnerData() {
+        viewModelScope.launch {
+            _uiState.value = repository.refreshState(_uiState.value)
+        }
+    }
+
+    private fun syncPartnerProfile() {
+        viewModelScope.launch {
+            _uiState.value = repository.updateProfile(_uiState.value)
+        }
     }
 
     private companion object {
