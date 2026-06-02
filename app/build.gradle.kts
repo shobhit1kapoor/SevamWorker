@@ -84,7 +84,7 @@ android {
     buildTypes {
         getByName("debug") {
             isMinifyEnabled = false
-            isTestCoverageEnabled = true
+            isTestCoverageEnabled = false
             buildConfigField(
                 "String",
                 "SUPABASE_URL",
