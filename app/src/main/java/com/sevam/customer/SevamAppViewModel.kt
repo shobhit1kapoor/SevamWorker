@@ -3,6 +3,7 @@ package com.sevam.customer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sevam.customer.partner.data.MockPartnerRepository
+import com.sevam.customer.partner.data.PartnerAuthClient
 import com.sevam.customer.partner.data.PartnerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -126,6 +127,7 @@ private const val OTP_MAX_LENGTH = 6
 @HiltViewModel
 class SevamAppViewModel @Inject constructor(
     private val repository: PartnerRepository,
+    private val authClient: PartnerAuthClient,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(repository.initialState())
     val uiState: StateFlow<SevamPartnerUiState> = _uiState
@@ -141,7 +143,14 @@ class SevamAppViewModel @Inject constructor(
     fun requestOtp(onSuccess: () -> Unit) {
         val phone = normalizePhoneNumber(_uiState.value.phoneNumber.ifBlank { "+91 98765 43210" })
         _uiState.update { it.copy(phoneNumber = phone, authErrorMessage = null) }
-        onSuccess()
+        viewModelScope.launch {
+            val result = authClient.requestOtp(phone)
+            if (result.success) {
+                onSuccess()
+            } else {
+                _uiState.update { it.copy(authErrorMessage = result.errorMessage ?: "Could not send OTP.") }
+            }
+        }
     }
 
     fun completeLogin() {
@@ -149,7 +158,24 @@ class SevamAppViewModel @Inject constructor(
             _uiState.update { it.copy(authErrorMessage = "Enter the 6-digit OTP to continue.") }
             return
         }
-        completeDebugLogin()
+        viewModelScope.launch {
+            val current = _uiState.value
+            val result = authClient.verifyOtp(current.phoneNumber, current.otp)
+            if (result.success) {
+                _uiState.update {
+                    it.copy(
+                        isLoggedIn = true,
+                        isDebugSession = false,
+                        profile = it.profile.copy(phone = current.phoneNumber),
+                        otp = "",
+                        authErrorMessage = null,
+                    )
+                }
+                refreshPartnerData()
+            } else {
+                _uiState.update { it.copy(authErrorMessage = result.errorMessage ?: "OTP verification failed.") }
+            }
+        }
     }
 
     fun completeDebugLogin() {
@@ -168,6 +194,7 @@ class SevamAppViewModel @Inject constructor(
     }
 
     fun logout() {
+        authClient.clearSession()
         _uiState.value = repository.initialState()
     }
 

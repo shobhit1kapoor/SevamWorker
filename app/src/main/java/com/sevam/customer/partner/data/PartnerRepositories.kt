@@ -33,6 +33,11 @@ interface PartnerAuthTokenProvider {
     fun accessToken(): String?
 }
 
+data class PartnerAuthResult(
+    val success: Boolean,
+    val errorMessage: String? = null,
+)
+
 @Singleton
 class InMemoryPartnerAuthTokenProvider @Inject constructor() : PartnerAuthTokenProvider {
     @Volatile
@@ -43,6 +48,98 @@ class InMemoryPartnerAuthTokenProvider @Inject constructor() : PartnerAuthTokenP
     fun setAccessToken(value: String?) {
         token = value
     }
+}
+
+@Singleton
+class PartnerAuthClient @Inject constructor(
+    private val tokenProvider: InMemoryPartnerAuthTokenProvider,
+    @com.sevam.customer.di.IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+) {
+    private val supabaseUrl = BuildConfig.SUPABASE_URL.trimEnd('/')
+    private val anonKey = BuildConfig.SUPABASE_ANON_KEY
+
+    suspend fun requestOtp(phone: String): PartnerAuthResult = withContext(ioDispatcher) {
+        if (supabaseUrl.isBlank() || anonKey.isBlank()) {
+            return@withContext PartnerAuthResult(false, "Supabase config is missing.")
+        }
+
+        val body = JSONObject()
+            .put("phone", phone)
+            .put("channel", "sms")
+            .put("should_create_user", true)
+
+        val response = requestSupabaseAuth("otp", body)
+        if (response.ok) {
+            PartnerAuthResult(true)
+        } else {
+            PartnerAuthResult(false, response.errorMessage ?: "Could not send OTP.")
+        }
+    }
+
+    suspend fun verifyOtp(phone: String, otp: String): PartnerAuthResult = withContext(ioDispatcher) {
+        if (supabaseUrl.isBlank() || anonKey.isBlank()) {
+            return@withContext PartnerAuthResult(false, "Supabase config is missing.")
+        }
+
+        val body = JSONObject()
+            .put("phone", phone)
+            .put("token", otp)
+            .put("type", "sms")
+
+        val response = requestSupabaseAuth("verify", body)
+        val accessToken = response.json?.optString("access_token").orEmpty()
+        if (response.ok && accessToken.isNotBlank()) {
+            tokenProvider.setAccessToken(accessToken)
+            PartnerAuthResult(true)
+        } else {
+            PartnerAuthResult(false, response.errorMessage ?: "OTP verification failed.")
+        }
+    }
+
+    fun clearSession() {
+        tokenProvider.setAccessToken(null)
+    }
+
+    private fun requestSupabaseAuth(path: String, body: JSONObject): SupabaseAuthResponse {
+        val connection = (URL("$supabaseUrl/auth/v1/$path").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 10_000
+            readTimeout = 15_000
+            doOutput = true
+            setRequestProperty("apikey", anonKey)
+            setRequestProperty("Authorization", "Bearer $anonKey")
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Accept", "application/json")
+        }
+
+        return try {
+            connection.outputStream.use { stream ->
+                stream.write(body.toString().toByteArray(Charsets.UTF_8))
+            }
+
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            val json = text.takeIf { it.isNotBlank() }?.let(::JSONObject)
+            SupabaseAuthResponse(
+                ok = status in 200..299,
+                json = json,
+                errorMessage = json?.optString("msg").orEmpty()
+                    .ifBlank { json?.optString("message").orEmpty() }
+                    .ifBlank { json?.optString("error_description").orEmpty() },
+            )
+        } catch (error: IOException) {
+            SupabaseAuthResponse(false, null, error.message ?: "Network error.")
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private data class SupabaseAuthResponse(
+        val ok: Boolean,
+        val json: JSONObject?,
+        val errorMessage: String?,
+    )
 }
 
 class MockPartnerRepository @Inject constructor() : PartnerRepository {
