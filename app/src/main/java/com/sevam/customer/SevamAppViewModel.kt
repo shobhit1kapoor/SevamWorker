@@ -2,6 +2,7 @@ package com.sevam.customer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sevam.partner.BuildConfig
 import com.sevam.customer.partner.data.MockPartnerRepository
 import com.sevam.customer.partner.data.PartnerAuthClient
 import com.sevam.customer.partner.data.PartnerRepository
@@ -179,6 +180,10 @@ class SevamAppViewModel @Inject constructor(
     }
 
     fun completeDebugLogin() {
+        if (BuildConfig.DEBUG) {
+            openDebugApprovedHome()
+            return
+        }
         val phone = normalizePhoneNumber(_uiState.value.phoneNumber.ifBlank { "+91 98765 43210" })
         _uiState.update {
             it.copy(
@@ -190,7 +195,45 @@ class SevamAppViewModel @Inject constructor(
                 authErrorMessage = null,
             )
         }
-        refreshPartnerData()
+    }
+
+    fun openDebugApprovedHome() {
+        if (!BuildConfig.DEBUG || _uiState.value.onboardingStep == OnboardingStep.APPROVED) return
+        val phone = normalizePhoneNumber(_uiState.value.phoneNumber.ifBlank { "+91 98765 43210" })
+        _uiState.update {
+            it.copy(
+                isLoggedIn = true,
+                isDebugSession = true,
+                phoneNumber = phone,
+                onboardingStep = OnboardingStep.APPROVED,
+                profile = it.profile.copy(
+                    name = "Rajesh Kumar",
+                    phone = phone,
+                    photoLabel = "R",
+                    category = "Plumber",
+                ),
+                kyc = it.kyc.copy(
+                    governmentIdUploaded = true,
+                    selfieUploaded = true,
+                    addressProofUploaded = true,
+                    status = KycStatus.VERIFIED,
+                ),
+                workSetup = it.workSetup.copy(
+                    skills = setOf("Pipe repair", "Tap repair", "Leak repair"),
+                    experienceYears = "4",
+                    toolsAvailable = true,
+                    preferredWorkTypes = setOf("Instant jobs", "Daily work"),
+                ),
+                payout = it.payout.copy(
+                    upiId = "rajesh@upi",
+                    bankAccountLast4 = "1234",
+                    added = true,
+                ),
+                approvalStatus = ApprovalStatus.APPROVED,
+                isOnline = true,
+                authErrorMessage = null,
+            )
+        }
     }
 
     fun logout() {

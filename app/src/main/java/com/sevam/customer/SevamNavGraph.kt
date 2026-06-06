@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -27,30 +28,40 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AttachMoney
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PendingActions
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.outlined.ToggleOff
 import androidx.compose.material.icons.outlined.ToggleOn
+import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material.icons.outlined.WorkOutline
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -75,8 +86,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.sevam.core.ui.SevamColors
 import com.sevam.customer.partner.data.MockPartnerRepository
+import com.sevam.partner.BuildConfig
 
 private const val LOGIN_ROUTE = "login"
 private const val OTP_ROUTE = "otp"
@@ -103,6 +116,12 @@ fun SevamNavGraph(
     val shellRoutes = setOf(HOME_ROUTE, JOBS_ROUTE, EARNINGS_ROUTE, PROFILE_ROUTE)
     val shouldShowShell = currentRoute in shellRoutes
 
+    LaunchedEffect(Unit) {
+        if (BuildConfig.DEBUG) {
+            viewModel.openDebugApprovedHome()
+        }
+    }
+
     LaunchedEffect(state.isLoggedIn, state.onboardingStep) {
         if (!state.isLoggedIn && currentRoute != LOGIN_ROUTE && currentRoute != OTP_ROUTE) {
             navController.navigate(LOGIN_ROUTE) {
@@ -120,14 +139,16 @@ fun SevamNavGraph(
     }
 
     Scaffold(
-        containerColor = Color(0xFFF6F8FC),
+        containerColor = Color(0xFFFAFBFF),
         bottomBar = {
             if (shouldShowShell) {
                 PartnerBottomBar(currentRoute = currentRoute) { route ->
                     navController.navigate(route) {
                         launchSingleTop = true
-                        popUpTo(HOME_ROUTE) { saveState = true }
-                        restoreState = true
+                        restoreState = false
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = false
+                        }
                     }
                 }
             }
@@ -192,15 +213,38 @@ private fun PartnerBottomBar(
         PartnerBottomItem(EARNINGS_ROUTE, "Earnings", Icons.Outlined.AttachMoney),
         PartnerBottomItem(PROFILE_ROUTE, "Profile", Icons.Outlined.AccountCircle),
     )
-    NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = Color.White,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, Colors.border),
+    ) {
+    NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
         items.forEach { item ->
             NavigationBarItem(
                 selected = currentRoute == item.route,
                 onClick = { onNavigate(item.route) },
-                icon = { Icon(item.icon, contentDescription = item.label, modifier = Modifier.size(22.dp)) },
-                label = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
+                icon = { Icon(item.icon, contentDescription = item.label, modifier = Modifier.size(24.dp)) },
+                label = {
+                    Text(
+                        item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (currentRoute == item.route) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Colors.blue,
+                    selectedTextColor = Colors.blue,
+                    indicatorColor = Color.Transparent,
+                    unselectedIconColor = Colors.muted,
+                    unselectedTextColor = Colors.muted,
+                ),
             )
         }
+    }
     }
 }
 
@@ -222,7 +266,7 @@ private fun PartnerLoginScreen(
         item {
             Spacer(modifier = Modifier.height(16.dp))
             BrandMark()
-            Text("Welcome to Sevam Partner", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Welcome to Sevam Partner", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(
                 "Get verified, receive nearby jobs, and manage your earnings from one simple app.",
                 color = Color(0xFF64748B),
@@ -274,7 +318,7 @@ private fun PartnerOtpScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
-            Text("Verify your OTP", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Verify your OTP", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text("Enter the 6-digit code sent to $phoneNumber.", color = Color(0xFF64748B))
         }
         item {
@@ -316,8 +360,8 @@ private fun PartnerOnboardingScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Text("Set up your partner profile", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(stepSubtitle(state.onboardingStep), color = Color(0xFF64748B))
+            Text("Set up your partner profile", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(stepSubtitle(state.onboardingStep), color = Color(0xFF64748B), style = MaterialTheme.typography.bodyMedium)
             StepProgress(current = state.onboardingStep)
         }
         item {
@@ -337,7 +381,7 @@ private fun PartnerOnboardingScreen(
 @Composable
 private fun BasicProfileStep(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
     PartnerCard {
-        Text("Basic profile", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text("Basic profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(state.profile.name, viewModel::updateProfileName, label = { Text("Full name") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(state.profile.phone, {}, enabled = false, label = { Text("Phone number") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(state.profile.city, viewModel::updateProfileCity, label = { Text("City") }, modifier = Modifier.fillMaxWidth())
@@ -351,8 +395,8 @@ private fun BasicProfileStep(state: SevamPartnerUiState, viewModel: SevamAppView
 @Composable
 private fun KycStep(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
     PartnerCard {
-        Text("KYC verification", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text("Upload documents so Sevam can verify that you are real and trustworthy.", color = Color(0xFF64748B))
+        Text("KYC verification", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("Upload documents so Sevam can verify that you are real and trustworthy.", color = Color(0xFF64748B), style = MaterialTheme.typography.bodyMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(listOf("Aadhaar", "PAN", "Voter ID", "Driving License")) { idType ->
                 ChoiceChip(label = idType, selected = state.kyc.idType == idType) { viewModel.selectIdType(idType) }
@@ -388,8 +432,8 @@ private fun CategoryStep(viewModel: SevamAppViewModel) {
 @Composable
 private fun WorkSetupStep(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
     PartnerCard {
-        Text("${state.profile.category} setup", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text("Choose your skills and work preferences.", color = Color(0xFF64748B))
+        Text("${state.profile.category} setup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("Choose your skills and work preferences.", color = Color(0xFF64748B), style = MaterialTheme.typography.bodyMedium)
         FlowChips(viewModel.skillsForSelectedCategory(), state.workSetup.skills, viewModel::toggleSkill)
         OutlinedTextField(
             value = state.workSetup.experienceYears,
@@ -411,8 +455,8 @@ private fun WorkSetupStep(state: SevamPartnerUiState, viewModel: SevamAppViewMod
 @Composable
 private fun PayoutStep(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
     PartnerCard {
-        Text("Payout details", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-        Text("Add UPI or bank details so Sevam can pay you after completed jobs.", color = Color(0xFF64748B))
+        Text("Payout details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("Add UPI or bank details so Sevam can pay you after completed jobs.", color = Color(0xFF64748B), style = MaterialTheme.typography.bodyMedium)
         OutlinedTextField(state.payout.upiId, viewModel::updateUpi, label = { Text("UPI ID") }, placeholder = { Text("name@upi") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(
             state.payout.bankAccountLast4,
@@ -430,7 +474,7 @@ private fun PayoutStep(state: SevamPartnerUiState, viewModel: SevamAppViewModel)
 private fun AdminReviewStep(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
     PartnerCard {
         Icon(Icons.Outlined.PendingActions, contentDescription = null, tint = Colors.blue, modifier = Modifier.size(42.dp))
-        Text("Profile under review", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text("Profile under review", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
             "Your documents, service category, work details, and payout information have been submitted. Sevam admin approval is required before you can go online.",
             color = Color(0xFF64748B),
@@ -444,7 +488,17 @@ private fun AdminReviewStep(state: SevamPartnerUiState, viewModel: SevamAppViewM
 
 @Composable
 private fun PartnerHomeScreen(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
-    WorkerScaffold(title = "Sevam Partner", subtitle = state.profile.area) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(top = 28.dp, bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
+    ) {
+        item {
+            HomePartnerHeader(state)
+        }
         item {
             HeroStatusCard(state, viewModel)
         }
@@ -457,12 +511,12 @@ private fun PartnerHomeScreen(state: SevamPartnerUiState, viewModel: SevamAppVie
             }
         }
         item {
-            SectionHeader("New job requests", "Nearby work")
+            SectionHeader("New Job Request", null)
         }
         if (state.jobRequests.isEmpty()) {
             item { EmptyCard("No new requests right now. Stay online to receive nearby jobs.") }
         } else {
-            items(state.jobRequests) { job ->
+            items(state.jobRequests.take(1)) { job ->
                 JobRequestCard(job = job, onAccept = { viewModel.acceptJob(job.id) }, onReject = { viewModel.rejectJob(job.id) })
             }
         }
@@ -471,16 +525,22 @@ private fun PartnerHomeScreen(state: SevamPartnerUiState, viewModel: SevamAppVie
 
 @Composable
 private fun PartnerJobsScreen(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
-    val tabs = listOf("Requests", "Active", "Upcoming", "Completed")
-    WorkerScaffold(title = "Jobs", subtitle = "Manage requests and active work") {
+    val tabs = listOf("Requests", "Active", "Completed")
+    val selectedTab = state.selectedJobTab.takeIf { it in tabs } ?: "Requests"
+    WorkerScaffold(title = "Jobs", subtitle = "Manage your service jobs") {
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(tabs) { tab ->
-                    ChoiceChip(tab, state.selectedJobTab == tab) { viewModel.selectJobTab(tab) }
-                }
+            SegmentedTabs(tabs = tabs, selected = selectedTab) { tab ->
+                viewModel.selectJobTab(tab)
             }
         }
-        when (state.selectedJobTab) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                StatTile(Icons.Outlined.WorkOutline, "Requests", "${state.jobRequests.size}", Colors.blueSoft, Colors.blue, Modifier.weight(1f))
+                StatTile(Icons.Outlined.PlayCircle, "Active", "${viewModel.activeJobs().size}", Colors.successBg, Colors.success, Modifier.weight(1f))
+                StatTile(Icons.Outlined.CheckCircle, "Done", "${viewModel.completedJobs().size}", Color(0xFFF3E8FF), Color(0xFF8B5CF6), Modifier.weight(1f))
+            }
+        }
+        when (selectedTab) {
             "Requests" -> {
                 if (state.jobRequests.isEmpty()) item { EmptyCard("No pending requests.") }
                 items(state.jobRequests) { job -> JobRequestCard(job, { viewModel.acceptJob(job.id) }, { viewModel.rejectJob(job.id) }) }
@@ -490,7 +550,6 @@ private fun PartnerJobsScreen(state: SevamPartnerUiState, viewModel: SevamAppVie
                 if (activeJobs.isEmpty()) item { EmptyCard("No active jobs.") }
                 items(activeJobs) { job -> ActiveJobCard(job, onAdvance = { viewModel.advanceJob(job.id) }) }
             }
-            "Upcoming" -> item { EmptyCard("Scheduled jobs will appear here.") }
             "Completed" -> {
                 val completed = viewModel.completedJobs()
                 if (completed.isEmpty()) item { EmptyCard("Completed jobs will appear here.") }
@@ -504,69 +563,52 @@ private fun PartnerJobsScreen(state: SevamPartnerUiState, viewModel: SevamAppVie
 private fun PartnerEarningsScreen(state: SevamPartnerUiState) {
     WorkerScaffold(title = "Earnings", subtitle = "Track income and payouts") {
         item {
-            PartnerCard(
-                colors = CardDefaults.cardColors(containerColor = Colors.blue),
-                contentColor = Color.White,
-            ) {
-                Text("This month", color = Color.White.copy(alpha = 0.75f))
-                Text("Rs ${state.earnings.monthly}", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                Text("Pending payout Rs ${state.earnings.pendingPayout}", color = Color.White.copy(alpha = 0.75f))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                EarningSummaryCard("Today", "Rs ${state.earnings.today}", Icons.Outlined.Payments, Colors.successBg, Colors.success, Modifier.weight(1f))
+                EarningSummaryCard("Total", "Rs ${state.earnings.monthly}", Icons.Outlined.CalendarMonth, Colors.blueSoft, Colors.blue, Modifier.weight(1f))
             }
         }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SmallMetric("Today", "Rs ${state.earnings.today}", modifier = Modifier.weight(1f))
-                SmallMetric("This week", "Rs ${state.earnings.weekly}", modifier = Modifier.weight(1f))
-            }
-        }
-        item { SectionHeader("Payout history", "Clear money breakdown") }
+        item { SectionHeader("Recent Earnings", null) }
+        item { SegmentedTabs(tabs = listOf("All", "Paid", "Pending"), selected = "All", onSelect = {}) }
         items(state.jobs) { job ->
-            PayoutHistoryCard(job)
+            EarningHistoryCard(job)
         }
     }
 }
 
 @Composable
 private fun PartnerProfileScreen(state: SevamPartnerUiState, viewModel: SevamAppViewModel) {
-    WorkerScaffold(title = "Profile", subtitle = "Your Sevam partner account") {
+    WorkerScaffold(title = "", subtitle = "") {
         item {
-            PartnerCard {
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Avatar(label = state.profile.photoLabel)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(state.profile.name.ifBlank { "Sevam Partner" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Text(state.profile.category ?: "Category not selected", color = Color(0xFF64748B))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Star, contentDescription = null, tint = Colors.orange, modifier = Modifier.size(16.dp))
-                            Text("${state.profile.rating} rating • ${state.profile.completedJobs} jobs", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    StatusPill(state.kyc.status.displayName(), Colors.successBg, Colors.success)
+            ProfileHero(state)
+        }
+        item {
+            ProfileStats(state)
+        }
+        item {
+            PartnerCard(contentPadding = 18.dp) {
+                ProfileMenuRow(Icons.Outlined.Person, "Personal Information", "View and edit your details") {}
+                ProfileDivider()
+                ProfileMenuRow(Icons.Outlined.Verified, "KYC Information", "View your KYC details") {}
+                ProfileDivider()
+                ProfileMenuRow(Icons.Outlined.CreditCard, "Bank Information", "View your bank details") {}
+                ProfileDivider()
+                ProfileMenuRow(Icons.Outlined.Description, "Documents", "Manage your documents") {}
+                ProfileDivider()
+                ProfileMenuRow(Icons.Outlined.Notifications, "Notification Settings", "Manage preferences") {}
+                ProfileDivider()
+                ProfileMenuRow(Icons.Outlined.SupportAgent, "Help & Support", "Get help and contact support") {
+                    viewModel.selectSupportCategory("Help & Support")
                 }
             }
         }
         item {
-            SectionHeader("Work profile", null)
-            InfoList(
-                listOf(
-                    "Phone" to state.profile.phone,
-                    "City" to state.profile.city,
-                    "Area" to state.profile.area,
-                    "Skills" to state.workSetup.skills.joinToString().ifBlank { "Not added" },
-                    "Availability" to state.workSetup.availability,
-                    "Payout" to if (state.payout.upiId.isNotBlank()) state.payout.upiId else "Bank ending ${state.payout.bankAccountLast4}",
-                ),
-            )
-        }
-        item {
-            SectionHeader("Support", "Report issues quickly")
-            listOf("Payment issue", "Customer issue", "Job problem", "Safety issue", "Verification problem").forEach { category ->
-                SettingsRow(Icons.Outlined.ReportProblem, category) { viewModel.selectSupportCategory(category) }
-            }
-        }
-        item {
-            OutlinedButton(onClick = viewModel::logout, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                Text("Sign out")
+            PartnerCard(modifier = Modifier.clickable(onClick = viewModel::logout), contentPadding = 18.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    IconTile(Icons.Outlined.Logout, Color(0xFFFFEFEF), Color(0xFFEF4444))
+                    Text("Logout", color = Color(0xFFEF4444), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = Colors.muted)
+                }
             }
         }
     }
@@ -582,13 +624,24 @@ private fun WorkerScaffold(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 18.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(top = 28.dp, bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
-        item {
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Color(0xFF64748B))
+        if (title.isNotBlank() || subtitle.isNotBlank()) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (title.isNotBlank()) {
+                            Text(title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = Colors.text)
+                        }
+                        if (subtitle.isNotBlank()) {
+                            Text(subtitle, color = Colors.muted, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
+                        }
+                    }
+                    NotificationButton()
+                }
+            }
         }
         content()
     }
@@ -599,32 +652,36 @@ private fun HeroStatusCard(state: SevamPartnerUiState, viewModel: SevamAppViewMo
     Surface(
         shape = RoundedCornerShape(28.dp),
         color = Colors.blue,
-        shadowElevation = 6.dp,
+        shadowElevation = 10.dp,
     ) {
         Box(
             modifier = Modifier
-                .background(Brush.linearGradient(listOf(Colors.blue, Color(0xFF2563EB))))
-                .padding(20.dp),
+                .background(Brush.linearGradient(listOf(Color(0xFF0875FF), Color(0xFF0054E9))))
+                .padding(24.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Column {
-                        Text("Hello, ${state.profile.name.ifBlank { "Partner" }}", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Text(state.profile.category ?: "Complete setup to start earning", color = Color.White.copy(alpha = 0.78f))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.95f), modifier = Modifier.size(56.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Surface(shape = CircleShape, color = if (state.isOnline) Color(0xFF18C964) else Colors.muted, modifier = Modifier.size(20.dp)) {}
                     }
-                    Icon(
-                        if (state.isOnline) Icons.Outlined.ToggleOn else Icons.Outlined.ToggleOff,
-                        contentDescription = null,
-                        tint = if (state.isOnline) Color(0xFFBBF7D0) else Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clickable { viewModel.toggleOnline() },
-                    )
                 }
-                StatusPill(
-                    if (state.isOnline) "Online - receiving jobs" else "Offline",
-                    if (state.isOnline) Colors.successBg else Color.White.copy(alpha = 0.16f),
-                    if (state.isOnline) Colors.success else Color.White,
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (state.isOnline) "You're Online" else "You're Offline", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (state.isOnline) "You are ready to receive jobs." else "Go online when you are ready.",
+                        color = Color.White.copy(alpha = 0.9f),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    StatusPill("KYC Verified", Color.White, Colors.blue)
+                }
+                Icon(
+                    if (state.isOnline) Icons.Outlined.ToggleOn else Icons.Outlined.ToggleOff,
+                    contentDescription = null,
+                    tint = if (state.isOnline) Color(0xFF22C55E) else Color.White.copy(alpha = 0.72f),
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clickable { viewModel.toggleOnline() },
                 )
             }
         }
@@ -633,78 +690,91 @@ private fun HeroStatusCard(state: SevamPartnerUiState, viewModel: SevamAppViewMo
 
 @Composable
 private fun MetricGrid(state: SevamPartnerUiState) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SmallMetric("Today earned", "Rs ${state.earnings.today}", Modifier.weight(1f))
-            SmallMetric("Today jobs", "${state.jobs.count { it.status != JobStatus.COMPLETED }}", Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SmallMetric("Rating", "${state.profile.rating}", Modifier.weight(1f))
-            SmallMetric("Status", state.approvalStatus.displayName(), Modifier.weight(1f))
-        }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        StatTile(Icons.Outlined.Payments, "Today's Earnings", "Rs ${state.earnings.today}", Colors.successBg, Colors.success, Modifier.weight(1f))
+        StatTile(Icons.Outlined.WorkOutline, "Today's Jobs", "${state.jobs.count { it.status != JobStatus.COMPLETED }}", Colors.blueSoft, Colors.blue, Modifier.weight(1f))
+        StatTile(Icons.Outlined.Star, "Rating", "${state.profile.rating}", Color(0xFFFFF4E5), Colors.orange, Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun JobRequestCard(job: PartnerJob, onAccept: () -> Unit, onReject: () -> Unit) {
-    PartnerCard {
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(job.serviceName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("${job.customerArea} • ${job.distanceKm} km away", color = Color(0xFF64748B))
-                Text(job.scheduledTime, color = Color(0xFF64748B), style = MaterialTheme.typography.bodySmall)
+    PartnerCard(contentPadding = 16.dp) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                JobIconBubble(job.serviceName)
+                StatusPill(if (job.distanceKm <= 3.0) "New" else "Nearby", Colors.blueSoft, Colors.blue)
             }
-            Text("Rs ${job.estimatedEarning}", fontWeight = FontWeight.Bold, color = Colors.blue)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text(job.serviceName.shortServiceName(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Colors.text, modifier = Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Estimated Earning", color = Colors.muted, style = MaterialTheme.typography.bodySmall)
+                        Text("Rs ${job.estimatedEarning}", fontWeight = FontWeight.Bold, color = Colors.orange, style = MaterialTheme.typography.headlineSmall)
+                    }
+                }
+                InfoRow(Icons.Outlined.CalendarMonth, job.scheduledTime.asCompactTimeLabel())
+                InfoRow(Icons.Outlined.LocationOn, job.customerArea)
+                InfoRow(Icons.Outlined.Map, "${job.distanceKm} km away")
+            }
         }
-        Text("Full address unlocks after you accept.", color = Color(0xFF94A3B8), style = MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = onReject, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) {
+        HorizontalDivider(color = Colors.border)
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = onReject,
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, Colors.border),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Colors.text),
+            ) {
                 Text("Reject")
             }
-            PrimaryAction("Accept", modifier = Modifier.weight(1f), onClick = onAccept)
+            PrimaryAction("Accept Job", modifier = Modifier.weight(1f), onClick = onAccept)
         }
     }
 }
 
 @Composable
 private fun ActiveJobCard(job: PartnerJob, onAdvance: () -> Unit) {
-    PartnerCard {
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
+    PartnerCard(contentPadding = 20.dp) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            JobIconBubble(job.serviceName)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusPill(job.status.displayName(), Colors.infoBg, Colors.info)
-                Text(job.serviceName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(job.customerName, color = Color(0xFF64748B))
+                Text(job.serviceName.shortServiceName(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Colors.text)
+                Text(job.customerName, color = Colors.muted)
+                InfoRow(Icons.Outlined.LocationOn, job.fullAddress)
+                InfoRow(Icons.Outlined.CalendarMonth, job.scheduledTime.asCompactTimeLabel())
             }
-            Text("Rs ${job.estimatedEarning}", fontWeight = FontWeight.Bold)
+            Text("Rs ${job.estimatedEarning}", fontWeight = FontWeight.Bold, color = Colors.orange, style = MaterialTheme.typography.titleLarge)
         }
-        InfoRow(Icons.Outlined.LocationOn, job.fullAddress)
-        InfoRow(Icons.Outlined.Schedule, job.scheduledTime)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = {}, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = {}, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Colors.border)) {
                 Icon(Icons.Outlined.Call, contentDescription = null, modifier = Modifier.size(16.dp))
                 Text(" Call")
             }
-            OutlinedButton(onClick = {}, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) {
+            OutlinedButton(onClick = {}, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Colors.border)) {
                 Icon(Icons.Outlined.Map, contentDescription = null, modifier = Modifier.size(16.dp))
                 Text(" Map")
             }
         }
         PrimaryAction(nextJobAction(job.status), onClick = onAdvance)
-        if (job.status == JobStatus.ARRIVED) Text("Customer start OTP required before starting.", color = Colors.warning)
-        if (job.status == JobStatus.STARTED) Text("Customer completion OTP required before completing.", color = Colors.warning)
+        if (job.status == JobStatus.ARRIVED) Text("Customer start OTP required before starting.", color = Colors.warning, style = MaterialTheme.typography.bodySmall)
+        if (job.status == JobStatus.STARTED) Text("Customer completion OTP required before completing.", color = Colors.warning, style = MaterialTheme.typography.bodySmall)
     }
 }
 
 @Composable
 private fun CompletedJobCard(job: PartnerJob) {
-    PartnerCard {
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Column {
+    PartnerCard(contentPadding = 20.dp) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            JobIconBubble(job.serviceName)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 StatusPill("Completed", Colors.successBg, Colors.success)
-                Text(job.serviceName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(job.customerArea, color = Color(0xFF64748B))
+                Text(job.serviceName.shortServiceName(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Colors.text)
+                Text(job.customerArea, color = Colors.muted)
             }
-            Text("Rs ${job.estimatedEarning}", fontWeight = FontWeight.Bold)
+            Text("Rs ${job.estimatedEarning}", fontWeight = FontWeight.Bold, color = Colors.text, style = MaterialTheme.typography.titleLarge)
         }
     }
 }
@@ -724,21 +794,215 @@ private fun PayoutHistoryCard(job: PartnerJob) {
 }
 
 @Composable
+private fun HomePartnerHeader(state: SevamPartnerUiState) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Avatar(label = state.profile.photoLabel, size = 72.dp)
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(displayName(state.profile.name).substringBefore(" "), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Colors.text)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(state.profile.category ?: "Partner", color = Colors.muted, style = MaterialTheme.typography.titleMedium)
+                Text("-", color = Colors.muted, style = MaterialTheme.typography.titleMedium)
+                Text("Verified Partner", color = Colors.muted, style = MaterialTheme.typography.titleMedium)
+                Icon(Icons.Outlined.Verified, contentDescription = null, tint = Colors.blue, modifier = Modifier.size(20.dp))
+            }
+        }
+        NotificationButton()
+    }
+}
+
+@Composable
+private fun NotificationButton() {
+    Box {
+        Surface(shape = CircleShape, color = Color.White, shadowElevation = 2.dp, border = BorderStroke(1.dp, Colors.border)) {
+            Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Colors.text, modifier = Modifier.padding(12.dp).size(24.dp))
+        }
+        Surface(shape = CircleShape, color = Color(0xFFFF3B4F), modifier = Modifier.align(Alignment.TopEnd).size(10.dp)) {}
+    }
+}
+
+@Composable
+private fun SegmentedTabs(tabs: List<String>, selected: String, onSelect: (String) -> Unit) {
+    Surface(shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, Colors.border), shadowElevation = 1.dp) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            tabs.forEach { tab ->
+                val isSelected = selected == tab
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelect(tab) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (isSelected) Colors.blue else Color.Transparent,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(tab, color = if (isSelected) Color.White else Colors.muted, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatTile(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    iconBackground: Color,
+    iconColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    PartnerCard(modifier = modifier, contentPadding = 12.dp) {
+        IconTile(icon, iconBackground, iconColor)
+        Text(label, color = Colors.muted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = Colors.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun EarningSummaryCard(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    iconBackground: Color,
+    iconColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    PartnerCard(modifier = modifier, contentPadding = 18.dp) {
+        IconTile(icon, iconBackground, iconColor)
+        Text(label, color = Colors.muted, style = MaterialTheme.typography.titleMedium)
+        Text(value, color = Colors.text, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun EarningHistoryCard(job: PartnerJob) {
+    val paid = job.status == JobStatus.COMPLETED
+    PartnerCard(contentPadding = 18.dp) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            JobIconBubble(job.serviceName)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(job.serviceName.shortServiceName(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Colors.text)
+                InfoRow(Icons.Outlined.CalendarMonth, job.scheduledTime.asCompactTimeLabel())
+                InfoRow(Icons.Outlined.LocationOn, job.customerArea)
+            }
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Rs ${job.estimatedEarning}", color = if (paid) Colors.success else Colors.orange, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                StatusPill(if (paid) "Paid" else "Pending", if (paid) Colors.successBg else Colors.warningBg, if (paid) Colors.success else Colors.warning)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileHero(state: SevamPartnerUiState) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Avatar(label = state.profile.photoLabel, size = 82.dp)
+        Spacer(Modifier.width(18.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(displayName(state.profile.name), color = Colors.text, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(state.profile.category ?: "Partner", color = Colors.muted, style = MaterialTheme.typography.titleMedium)
+                Text("-", color = Colors.muted)
+                Text("Verified Partner", color = Colors.muted, style = MaterialTheme.typography.titleMedium)
+                Icon(Icons.Outlined.Verified, contentDescription = null, tint = Colors.blue, modifier = Modifier.size(20.dp))
+            }
+        }
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = Colors.muted, modifier = Modifier.size(30.dp))
+    }
+}
+
+@Composable
+private fun ProfileStats(state: SevamPartnerUiState) {
+    PartnerCard(contentPadding = 18.dp) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            ProfileStat(Icons.Outlined.WorkOutline, "${state.profile.completedJobs}", "Jobs Completed", Colors.blueSoft, Colors.blue, Modifier.weight(1f))
+            VerticalDivider()
+            ProfileStat(Icons.Outlined.AttachMoney, "Rs ${state.earnings.monthly}", "Total Earnings", Colors.successBg, Colors.success, Modifier.weight(1f))
+            VerticalDivider()
+            ProfileStat(Icons.Outlined.Star, "${state.profile.rating}", "Rating", Color(0xFFFFF4E5), Colors.orange, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun ProfileStat(icon: ImageVector, value: String, label: String, iconBackground: Color, iconColor: Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        IconTile(icon, iconBackground, iconColor)
+        Text(value, color = Colors.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(label, color = Colors.muted, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun ProfileMenuRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        IconTile(icon, Colors.blueSoft, Colors.blue)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, color = Colors.text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = Colors.muted, style = MaterialTheme.typography.bodyMedium)
+        }
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = Colors.muted)
+    }
+}
+
+@Composable
+private fun ProfileDivider() {
+    HorizontalDivider(color = Colors.border, modifier = Modifier.padding(start = 74.dp))
+}
+
+@Composable
+private fun IconTile(icon: ImageVector, background: Color, foreground: Color) {
+    Surface(shape = RoundedCornerShape(15.dp), color = background, modifier = Modifier.size(50.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(25.dp))
+        }
+    }
+}
+
+@Composable
+private fun JobIconBubble(serviceName: String) {
+    val isElectrical = serviceName.contains("switch", ignoreCase = true) || serviceName.contains("electric", ignoreCase = true)
+    IconTile(
+        icon = if (isElectrical) Icons.Outlined.Badge else Icons.Outlined.SupportAgent,
+        background = if (isElectrical) Color(0xFFFFF4E5) else Colors.blueSoft,
+        foreground = if (isElectrical) Colors.orange else Colors.blue,
+    )
+}
+
+@Composable
+private fun VerticalDivider() {
+    Surface(modifier = Modifier.width(1.dp).height(92.dp), color = Colors.border) {}
+}
+
+@Composable
 private fun PartnerCard(
     modifier: Modifier = Modifier,
     colors: androidx.compose.material3.CardColors = CardDefaults.cardColors(containerColor = Color.White),
     contentColor: Color = Color.Unspecified,
+    contentPadding: androidx.compose.ui.unit.Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(22.dp),
         color = colors.containerColor,
         contentColor = contentColor,
-        shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+        shadowElevation = 5.dp,
+        border = BorderStroke(1.dp, Colors.border),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        Column(modifier = Modifier.padding(contentPadding), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
 
@@ -766,13 +1030,13 @@ private fun StepProgress(current: OnboardingStep) {
 
 @Composable
 private fun PrimaryAction(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    androidx.compose.material3.Button(
+    Button(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        modifier = modifier.fillMaxWidth().height(56.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Colors.orange),
+        colors = ButtonDefaults.buttonColors(containerColor = Colors.blue),
     ) {
-        Text(text, fontWeight = FontWeight.SemiBold)
+        Text(text, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
     }
 }
 
@@ -780,7 +1044,7 @@ private fun PrimaryAction(text: String, modifier: Modifier = Modifier, onClick: 
 private fun SmallMetric(label: String, value: String, modifier: Modifier = Modifier) {
     PartnerCard(modifier = modifier) {
         Text(label, color = Color(0xFF64748B), style = MaterialTheme.typography.bodySmall)
-        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -857,8 +1121,8 @@ private fun ToggleCard(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun SectionHeader(title: String, subtitle: String?) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        subtitle?.let { Text(it, color = Color(0xFF64748B), style = MaterialTheme.typography.bodyMedium) }
+        Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Colors.text)
+        subtitle?.let { Text(it, color = Colors.muted, style = MaterialTheme.typography.bodyMedium) }
     }
 }
 
@@ -919,8 +1183,8 @@ private fun SettingsRow(icon: ImageVector, label: String, onClick: () -> Unit) {
 @Composable
 private fun InfoRow(icon: ImageVector, text: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-        Icon(icon, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
-        Text(text, color = Color(0xFF475569), style = MaterialTheme.typography.bodyMedium)
+        Icon(icon, contentDescription = null, tint = Colors.muted, modifier = Modifier.size(18.dp))
+        Text(text, color = Colors.muted, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -938,15 +1202,16 @@ private fun StatusPill(text: String, background: Color, foreground: Color) {
 }
 
 @Composable
-private fun Avatar(label: String) {
-    Surface(shape = CircleShape, color = Colors.blueSoft, shadowElevation = 2.dp) {
-        Text(
-            text = label.ifBlank { "S" }.take(1),
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-            color = Colors.blue,
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleLarge,
-        )
+private fun Avatar(label: String, size: androidx.compose.ui.unit.Dp = 48.dp) {
+    Surface(shape = CircleShape, color = Colors.blueSoft, shadowElevation = 2.dp, modifier = Modifier.size(size), border = BorderStroke(1.dp, Color(0xFFBFD8FF))) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label.ifBlank { "S" }.take(1),
+                color = Colors.blue,
+                fontWeight = FontWeight.Bold,
+                style = if (size > 60.dp) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+            )
+        }
     }
 }
 
@@ -1042,8 +1307,26 @@ private fun JobStatus.displayName(): String {
     }
 }
 
+private fun displayName(name: String): String {
+    return name.ifBlank { "Partner" }.replace("%20", " ")
+}
+
+private fun String.shortServiceName(): String {
+    return replace("Leak ", "")
+        .replace("Bathroom Tap", "Tap")
+        .replace("Assistance", "")
+        .trim()
+}
+
+private fun String.asCompactTimeLabel(): String {
+    return replace(",", "").replace("  ", " ")
+}
+
 private object Colors {
-    val blue = Color(0xFF164A96)
+    val text = Color(0xFF080E25)
+    val muted = Color(0xFF606779)
+    val border = Color(0xFFE4E8F0)
+    val blue = Color(0xFF075FEF)
     val blueSoft = Color(0xFFEAF2FF)
     val orange = Color(0xFFFF6B1A)
     val success = Color(0xFF059669)
