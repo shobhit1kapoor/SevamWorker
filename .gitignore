@@ -1,0 +1,43 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Kotlin/IDE caches
+.kotlin/
+
+# Local config
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# VS Code workspace settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Signing / sensitive artifacts
+*.jks
+*.keystore
+
+# Generated files
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Firebase / Google services (if added later)
+**/google-services.json
+**/firebase_app_id_file.json
+
+# Fastlane artifacts (if used later)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
